@@ -1,5 +1,36 @@
-.venv/
-.vscode/
-.python-version
+# Python cache files - these are auto-generated
 __pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environment - we don't commit this
+venv/
+env/
+ENV/
+
+# Environment variables - contains secrets!
 .env
+
+# Logs - these are generated at runtime
+logs/
+*.log
+
+# IDE files - personal preference files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Database files (if using SQLite)
+*.db
+*.sqlite
+
+# Pytest cache
+.pytest_cache/
+.coverage
+htmlcov/
