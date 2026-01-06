@@ -7,7 +7,7 @@ from config.config import Config
 logger = logging.getLogger(__name__)
 
 
-class weather_loader:
+class WeatherLoader:
     
     def __init__(self):
         try:
@@ -18,11 +18,16 @@ class weather_loader:
             raise
     
     def load_city(self, city_data: Dict) -> Optional[int]:
-
+        """Load city data into the database, return city_id"""
         try:
             with self.engine.connect() as conn:
                 # Check if city already exists
-                select_query = text()
+                select_query = text("""
+                    SELECT city_id 
+                    FROM weather.cities 
+                    WHERE city_name = :city_name 
+                    AND country_code = :country_code
+                """)
                 
                 result = conn.execute(
                     select_query,
@@ -39,7 +44,12 @@ class weather_loader:
                     return row[0]
                 
                 # City doesn't exist, insert new city
-                insert_query = text()
+                insert_query = text("""
+                    INSERT INTO weather.cities 
+                    (city_name, country_code, latitude, longitude, timezone_offset)
+                    VALUES (:city_name, :country_code, :latitude, :longitude, :timezone_offset)
+                    RETURNING city_id
+                """)
                 
                 result = conn.execute(
                     insert_query,
@@ -60,11 +70,16 @@ class weather_loader:
             return None
     
     def load_weather_condition(self, condition_data: Dict) -> Optional[int]:
-
+        """Load weather condition data into the database, return condition_id"""
         try:
             with self.engine.connect() as conn:
                 # Check if condition already exists
-                select_query = text()
+                select_query = text("""
+                    SELECT condition_id 
+                    FROM weather.weather_conditions 
+                    WHERE main_condition = :main_condition 
+                    AND description = :description
+                """)
                 
                 result = conn.execute(
                     select_query,
@@ -80,7 +95,12 @@ class weather_loader:
                     return row[0]
                 
                 # Condition doesn't exist, insert new condition
-                insert_query = text()
+                insert_query = text("""
+                    INSERT INTO weather.weather_conditions 
+                    (main_condition, description, icon_code)
+                    VALUES (:main_condition, :description, :icon_code)
+                    RETURNING condition_id
+                """)
                 
                 result = conn.execute(
                     insert_query,
@@ -101,10 +121,43 @@ class weather_loader:
             return None
     
     def load_measurement(self, measurement_data: Dict, city_id: int, condition_id: int) -> bool:
-
+        """Load weather measurement data into the database"""
         try:
             with self.engine.connect() as conn:
-                insert_query = text()
+                insert_query = text("""
+                    INSERT INTO weather.weather_measurements 
+                    (
+                        city_id, 
+                        condition_id,
+                        temperature_celsius,
+                        feels_like_celsius,
+                        temp_min_celsius,
+                        temp_max_celsius,
+                        pressure_hpa,
+                        humidity_percent,
+                        visibility_meters,
+                        wind_speed_mps,
+                        wind_direction_degrees,
+                        cloudiness_percent,
+                        measurement_timestamp
+                    )
+                    VALUES (
+                        :city_id,
+                        :condition_id,
+                        :temperature_celsius,
+                        :feels_like_celsius,
+                        :temp_min_celsius,
+                        :temp_max_celsius,
+                        :pressure_hpa,
+                        :humidity_percent,
+                        :visibility_meters,
+                        :wind_speed_mps,
+                        :wind_direction_degrees,
+                        :cloudiness_percent,
+                        :measurement_timestamp
+                    )
+                    ON CONFLICT (city_id, measurement_timestamp) DO NOTHING
+                """)
                 
                 # Combine measurement data with foreign keys
                 data = {
@@ -112,6 +165,9 @@ class weather_loader:
                     'condition_id': condition_id,
                     **measurement_data
                 }
+                
+                # Remove api_call_timestamp if it exists (not in schema)
+                data.pop('api_call_timestamp', None)
                 
                 conn.execute(insert_query, data)
                 conn.commit()
@@ -127,7 +183,7 @@ class weather_loader:
             return False
     
     def load_weather_record(self, transformed_data: Dict) -> bool:
-
+        """Load a complete weather record (city + condition + measurement)"""
         try:
             # Load city
             city_id = self.load_city(transformed_data['city'])
@@ -158,7 +214,7 @@ class weather_loader:
             return False
     
     def load_multiple_records(self, transformed_data_list: List[Dict]) -> Dict:
-
+        """Load multiple weather records and return success/failure counts"""
         success_count = 0
         failure_count = 0
         
@@ -177,17 +233,18 @@ class weather_loader:
         }
     
     def test_connection(self) -> bool:
-        
+        """Test the database connection"""
         try:
             with self.engine.connect() as conn:
                 result = conn.execute(text("SELECT 1"))
-                logger.info("✓ Database connection test successful")
+                logger.info(" Database connection test successful")
                 return True
         except Exception as e:
             logger.error(f"Database connection test failed: {e}")
             return False
     
     def close(self):
+        """Close database connection"""
         if self.engine:
             self.engine.dispose()
             logger.info("Database connection closed")
@@ -196,23 +253,23 @@ class weather_loader:
 # Test code
 if __name__ == "__main__":
     from src.utils import setup_logging
-    from src.extract import weather_extractor
-    from src.transform import weather_transformer
+    from src.extract import WeatherExtractor
+    from src.transform import WeatherTransformer
     
     # Setup logging
     setup_logging()
     
     # Create instances
-    extractor = weather_extractor()
-    transformer = weather_transformer()
-    loader = weather_loader()
+    extractor = WeatherExtractor()
+    transformer = WeatherTransformer()
+    loader = WeatherLoader()
     
     # Test database connection
     if not loader.test_connection():
-        print("✗ Database connection failed")
+        print(" Database connection failed")
         exit(1)
     
-    print("✓ Database connected")
+    print(" Database connected")
     
     # Extract data
     raw_data = extractor.fetch_weather_by_city("Paris", "FR")

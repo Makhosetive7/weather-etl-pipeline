@@ -6,17 +6,17 @@ from src.utils import kelvin_to_celsius, validate_weather_data
 logger = logging.getLogger(__name__)
 
 
-class weather_transformer:
+class WeatherTransformer:
     
     def __init__(self):
         logger.info("Weather Transformer initialized")
     
     def transform_single_record(self, raw_data: Dict) -> Optional[Dict]:
-        
         try:
-
+            # Validate incoming data
             validate_weather_data(raw_data)
             
+            # Extract city information
             city_data = {
                 'city_name': raw_data['name'],
                 'country_code': raw_data['sys']['country'],
@@ -25,6 +25,7 @@ class weather_transformer:
                 'timezone_offset': raw_data.get('timezone', 0)
             }
             
+            # Extract weather condition information
             weather_info = raw_data['weather'][0]
             condition_data = {
                 'main_condition': weather_info['main'],
@@ -32,6 +33,7 @@ class weather_transformer:
                 'icon_code': weather_info['icon']
             }
             
+            # Extract measurement data
             main_data = raw_data['main']
             wind_data = raw_data.get('wind', {})
             
@@ -54,6 +56,7 @@ class weather_transformer:
                 'api_call_timestamp': datetime.now()
             }
             
+            # Combine all data
             transformed_data = {
                 'city': city_data,
                 'condition': condition_data,
@@ -72,7 +75,6 @@ class weather_transformer:
             return None
     
     def transform_multiple_records(self, raw_data_list: List[Dict]) -> List[Dict]:
-        
         transformed_records = []
         
         for raw_data in raw_data_list:
@@ -85,19 +87,21 @@ class weather_transformer:
         return transformed_records
     
     def validate_transformed_data(self, transformed_data: Dict) -> bool:
-        
         try:
+            # Check required sections exist
             required_sections = ['city', 'condition', 'measurement']
             for section in required_sections:
                 if section not in transformed_data:
                     logger.error(f"Missing required section: {section}")
                     return False
             
+            # Validate temperature is reasonable
             temp = transformed_data['measurement']['temperature_celsius']
             if temp < -100 or temp > 60:
                 logger.warning(f"Temperature out of reasonable range: {temp}°C")
                 return False
             
+            # Validate humidity is in valid range
             humidity = transformed_data['measurement']['humidity_percent']
             if humidity < 0 or humidity > 100:
                 logger.warning(f"Humidity out of valid range: {humidity}%")
@@ -112,12 +116,12 @@ class weather_transformer:
 
 if __name__ == "__main__":
     from src.utils import setup_logging
-    from src.extract import weather_extractor
+    from src.extract import WeatherExtractor
     
     setup_logging()
     
-    extractor = weather_extractor()
-    transformer = weather_transformer()
+    extractor = WeatherExtractor()
+    transformer = WeatherTransformer()
     
     raw_data = extractor.fetch_weather_by_city("Tokyo", "JP")
     
@@ -125,11 +129,11 @@ if __name__ == "__main__":
         transformed = transformer.transform_single_record(raw_data)
         
         if transformed and transformer.validate_transformed_data(transformed):
-            print("\n✓ Transformation successful!\n")
+            print("\n Transformation successful!\n")
             print(f"City: {transformed['city']['city_name']}, {transformed['city']['country_code']}")
             print(f"Temperature: {transformed['measurement']['temperature_celsius']}°C")
             print(f"Condition: {transformed['condition']['description']}")
         else:
-            print("\n✗ Transformation failed or validation error")
+            print("\n Transformation failed or validation error")
     else:
-        print("\n✗ Failed to fetch data")
+        print("\n Failed to fetch data")
