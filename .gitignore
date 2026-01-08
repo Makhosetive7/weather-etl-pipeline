@@ -5,7 +5,7 @@ __pycache__/
 *.so
 
 # Virtual environment - we don't commit this
-venv/
+.venv/
 env/
 ENV/
 
