@@ -34,3 +34,6 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Local project planning — not for GitHub
+PROJECT_TODOS.md

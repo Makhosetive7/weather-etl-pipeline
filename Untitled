@@ -1,0 +1,1 @@
+docker compose exec postgres psql -U postgres -d weather_analytics -c "SELECT * FROM weather.latest_weather ORDER BY city_name;"

@@ -1,0 +1,38 @@
+[project]
+name = "weather-etl-pipeline"
+version = "0.1.0"
+description = "ETL pipeline ingesting OpenWeather data into a PostgreSQL star schema"
+readme = "README.md"
+requires-python = ">=3.10"
+
+[tool.black]
+line-length = 100
+target-version = ["py310", "py311"]
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+    \.venv
+  | \.git
+  | __pycache__
+)/
+'''
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-v --tb=short"
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+]
+
+[tool.flake8]
+max-line-length = 100
+extend-ignore = ["E203", "W503"]
+exclude = [".venv", "__pycache__", ".git"]
