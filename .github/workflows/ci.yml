@@ -53,23 +53,28 @@ jobs:
       DB_PASSWORD: postgres
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/weather_analytics
 
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: weather_analytics
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready -U postgres -d weather_analytics
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
       - uses: actions/checkout@v4
+
+      - name: Start PostgreSQL
+        run: |
+          docker run -d \
+            --name ci-postgres \
+            -e POSTGRES_USER=postgres \
+            -e POSTGRES_PASSWORD=postgres \
+            -e POSTGRES_DB=weather_analytics \
+            -p 5432:5432 \
+            postgres:15
+          for i in $(seq 1 60); do
+            if docker exec ci-postgres pg_isready -U postgres; then
+              echo "PostgreSQL ready after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "PostgreSQL failed to start"
+          docker logs ci-postgres
+          exit 1
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -81,8 +86,12 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
 
-      - name: Wait for PostgreSQL and apply schema
+      - name: Apply database schema
         run: python scripts/ci_apply_schema.py
 
       - name: Integration tests
         run: python -m pytest tests/integration -m integration -v
+
+      - name: Stop PostgreSQL
+        if: always()
+        run: docker rm -f ci-postgres

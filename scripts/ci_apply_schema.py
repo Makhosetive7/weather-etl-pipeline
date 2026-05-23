@@ -29,6 +29,14 @@ def wait_for_postgres(engine) -> None:
     raise RuntimeError("PostgreSQL did not become ready in time")
 
 
+def schema_exists(engine) -> bool:
+    with engine.connect() as conn:
+        row = conn.execute(
+            text("SELECT 1 FROM information_schema.schemata WHERE schema_name = 'weather'")
+        ).fetchone()
+    return row is not None
+
+
 def apply_schema(engine) -> None:
     sql = SCHEMA_PATH.read_text()
     statements = [s.strip() for s in sql.split(";") if s.strip()]
@@ -44,7 +52,10 @@ def main() -> int:
     engine = create_engine(DATABASE_URL)
     try:
         wait_for_postgres(engine)
-        apply_schema(engine)
+        if schema_exists(engine):
+            print("Schema already exists, skipping apply")
+        else:
+            apply_schema(engine)
     finally:
         engine.dispose()
     return 0
