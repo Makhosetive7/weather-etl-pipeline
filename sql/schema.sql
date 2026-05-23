@@ -65,6 +65,22 @@ CREATE INDEX IF NOT EXISTS idx_measurements_city
 CREATE INDEX IF NOT EXISTS idx_measurements_timestamp 
     ON weather.weather_measurements(measurement_timestamp DESC);
 
+-- ETL pipeline run metadata (observability)
+CREATE TABLE IF NOT EXISTS weather.etl_runs (
+    run_id UUID PRIMARY KEY,
+    started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    finished_at TIMESTAMP,
+    status VARCHAR(20) NOT NULL,
+    records_extracted INT DEFAULT 0,
+    records_transformed INT DEFAULT 0,
+    records_loaded INT DEFAULT 0,
+    records_failed INT DEFAULT 0,
+    error_message TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_etl_runs_started
+    ON weather.etl_runs(started_at DESC);
+
 -- Create a view for latest weather per city
 CREATE OR REPLACE VIEW weather.latest_weather AS
 SELECT 

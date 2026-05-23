@@ -1,4 +1,4 @@
-.PHONY: help install install-dev db-up db-down db-init db-logs run test test-cov lint format clean
+.PHONY: help install install-dev install-api db-up db-down db-init db-logs docker-build docker-up docker-down api-run api-up run test test-cov test-integration lint format pre-commit clean
 
 PYTHON ?= python3
 PIP ?= pip3
@@ -13,9 +13,15 @@ help:
 	@echo "  make db-down      Stop PostgreSQL"
 	@echo "  make db-init      Apply sql/schema.sql to running database"
 	@echo "  make db-logs      Tail Postgres container logs"
-	@echo "  make run          Run the ETL pipeline"
+	@echo "  make docker-build Build ETL Docker image"
+	@echo "  make docker-up    Start Postgres + run ETL (requires .env)"
+	@echo "  make docker-down  Stop full Docker stack"
+	@echo "  make api-run      Run FastAPI locally (port 8000)"
+	@echo "  make api-up       Start Postgres + API in Docker"
+	@echo "  make run          Run the ETL pipeline (local Python)"
 	@echo "  make test         Run unit tests"
 	@echo "  make test-cov     Run tests with coverage report"
+	@echo "  make test-integration  Integration tests (requires Postgres)"
 	@echo "  make lint         Run flake8 and black --check"
 	@echo "  make format       Format code with black"
 	@echo "  make clean        Remove caches and coverage artifacts"
@@ -25,6 +31,9 @@ install:
 
 install-dev:
 	$(PIP) install -r requirements-dev.txt
+
+install-api:
+	$(PIP) install -r requirements-api.txt
 
 db-up:
 	$(COMPOSE) up -d postgres
@@ -42,21 +51,47 @@ db-init: db-up
 db-logs:
 	$(COMPOSE) logs -f postgres
 
+docker-build:
+	$(COMPOSE) build etl
+
+docker-up:
+	$(COMPOSE) up --build
+
+docker-down:
+	$(COMPOSE) down
+
+api-run:
+	$(PYTHON) -m uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
+
+api-up:
+	$(COMPOSE) up -d postgres api
+	@echo "API docs: http://localhost:8000/docs"
+
 run:
 	$(PYTHON) main.py
 
 test:
-	$(PYTHON) -m pytest tests/
+	$(PYTHON) -m pytest tests/ --ignore=tests/integration
 
 test-cov:
-	$(PYTHON) -m pytest tests/ --cov=src --cov-report=term-missing
+	$(PYTHON) -m pytest tests/ --ignore=tests/integration --cov=src --cov-report=term-missing
+
+test-integration: db-up
+	@echo "Waiting for PostgreSQL..."
+	@sleep 3
+	$(COMPOSE) exec -T postgres psql -U postgres -d weather_analytics -f - < sql/schema.sql 2>/dev/null || true
+	$(PYTHON) -m pytest tests/integration -m integration -v
 
 lint:
-	$(PYTHON) -m flake8 src tests config main.py
-	$(PYTHON) -m black --check src tests config main.py
+	$(PYTHON) -m flake8 src api tests config main.py
+	$(PYTHON) -m black --check src api tests config main.py
 
 format:
-	$(PYTHON) -m black src tests config main.py
+	$(PYTHON) -m black src api tests config main.py
+
+pre-commit:
+	pre-commit install
+	pre-commit run --all-files
 
 clean:
 	rm -rf .pytest_cache .coverage htmlcov/

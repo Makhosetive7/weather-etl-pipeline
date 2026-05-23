@@ -1,0 +1,14 @@
+.venv
+__pycache__
+.git
+.pytest_cache
+.coverage
+htmlcov/
+logs/
+.env
+*.md
+tests/
+.github/
+.pre-commit-config.yaml
+Makefile
+requirements-dev.txt

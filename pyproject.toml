@@ -21,12 +21,16 @@ extend-exclude = '''
 testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "-v --tb=short"
+markers = [
+    "integration: tests requiring a live PostgreSQL database",
+]
 
 [tool.coverage.run]
 source = ["src"]
 omit = ["tests/*"]
 
 [tool.coverage.report]
+fail_under = 70
 exclude_lines = [
     "pragma: no cover",
     "if __name__ == .__main__.:",

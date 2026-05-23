@@ -75,7 +75,7 @@ Add **20–30% buffer** for CI, Docker, and integration-test debugging.
 
 ---
 
-## Phase 2 — Real team project signals
+## Phase 2 — Real team project signals ✅ Complete
 
 **Goal:** Green CI, containerized stack, complete unit test coverage.  
 **Effort:** ~12–18 hours | **Scope:** A
@@ -93,7 +93,7 @@ Add **20–30% buffer** for CI, Docker, and integration-test debugging.
 
 ---
 
-## Phase 3 — Mid-level data engineering depth
+## Phase 3 — Mid-level data engineering depth ✅ Complete
 
 **Goal:** Production-style patterns recruiters ask about in interviews.  
 **Effort:** ~25–40 hours (core ~15–20 h) | **Scope:** B
@@ -139,12 +139,12 @@ Add **20–30% buffer** for CI, Docker, and integration-test debugging.
 **Pick one combo:**
 
 - **Data engineer focus:** cron + SQL data tests + `etl_runs` (from Phase 3)
-- **Full-stack signal:** FastAPI + analytics SQL
+- **Full-stack signal:** FastAPI + analytics SQL ✅
 - **Platform signal:** Docker + CI + structured logs + health endpoint
 
 ---
 
-## Phase 5 — Portfolio polish
+## Phase 5 — Portfolio polish ✅ Complete
 
 **Goal:** Resume, LinkedIn, and live demo alignment.  
 **Effort:** ~2–4 hours | **Scope:** C

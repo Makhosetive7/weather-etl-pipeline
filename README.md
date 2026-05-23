@@ -1,8 +1,14 @@
 # Weather ETL Pipeline
 
+![CI](https://github.com/Makhosetive7/weather-etl-pipeline/actions/workflows/ci.yml/badge.svg)
+![Python](https://img.shields.io/badge/python-3.10%2B-blue)
+![Tests](https://img.shields.io/badge/tests-89%20passed-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-~90%25-brightgreen)
+![License](https://img.shields.io/badge/license-MIT-green)
+
 A production-style **Extract–Transform–Load (ETL)** pipeline that pulls current weather from the [OpenWeather API](https://openweathermap.org/api), validates and transforms it, and loads it into a **PostgreSQL star schema** for analytics.
 
-Built to demonstrate skills commonly listed in data engineering job posts: ETL design, dimensional modeling, REST integration, retries, validation, SQLAlchemy, pytest, Docker, and environment-based configuration.
+Built to demonstrate skills commonly listed in data engineering job posts: ETL design, dimensional modeling, REST integration, retries, validation, SQLAlchemy, **FastAPI**, pytest, Docker, and environment-based configuration.
 
 ## Problem & solution
 
@@ -33,6 +39,7 @@ flowchart LR
     end
     API --> Retry --> Validate --> Map --> DimCity --> Fact
     Map --> DimCond --> Fact
+    Fact --> ReadAPI[FastAPI read API]
 ```
 
 ### Project layout
@@ -47,8 +54,14 @@ weather-etl-pipeline/
 │   └── utils.py          # Logging, retry decorator, helpers
 ├── sql/schema.sql        # Star schema DDL + views
 ├── tests/                # pytest unit tests (extract, transform)
+├── api/                  # FastAPI read layer
 ├── main.py               # Pipeline orchestration
-├── docker-compose.yml    # PostgreSQL
+├── Dockerfile            # ETL application image
+├── Dockerfile.api        # API service image
+├── docker-compose.yml    # PostgreSQL + ETL + API services
+├── docs/                 # Demo script, resume bullets, example output
+├── .github/workflows/    # CI (lint, test, coverage)
+├── LICENSE               # MIT
 └── Makefile              # Common commands
 ```
 
@@ -62,7 +75,8 @@ weather-etl-pipeline/
 | ORM / SQL | SQLAlchemy 2.x (raw SQL via `text()`) |
 | Config | `python-dotenv`, `config/config.py` |
 | Testing | `pytest`, `pytest-mock`, `unittest.mock` |
-| Containers | Docker Compose (Postgres) |
+| Read API | FastAPI, Uvicorn, OpenAPI |
+| Containers | Docker Compose (Postgres, ETL, API) |
 | Tooling | `black`, `flake8`, `Makefile`, `pyproject.toml` |
 
 ## Star schema
@@ -127,6 +141,41 @@ make run
 
 Logs are written to `logs/weather_etl.log` and stdout.
 
+### 5. Run with Docker (full stack)
+
+Requires a `.env` file with `OPENWEATHER_API_KEY` set. Postgres schema is applied automatically on first container start.
+
+```bash
+make docker-up
+```
+
+This starts PostgreSQL (with `sql/schema.sql` init) and runs the ETL container once. Use `make docker-down` to stop.
+
+Inside Docker, the ETL service connects to `postgres:5432` (overrides `DB_HOST` / `DB_PORT` from `.env`).
+
+### 6. Run the read API
+
+After data is loaded (`make run` or `make docker-up`):
+
+```bash
+make db-up          # if Postgres is not already running
+make api-run        # local: http://localhost:8000/docs
+# or
+make api-up         # Docker: Postgres + API on port 8000
+```
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /health` | API and database health |
+| `GET /api/v1/weather/latest` | Latest measurement per city |
+| `GET /api/v1/cities` | List tracked cities |
+| `GET /api/v1/cities/{id}/measurements` | History (`limit`, `from`, `to`) |
+| `GET /api/v1/analytics/temperature-summary` | Avg temp by city (rolling days) |
+| `GET /api/v1/analytics/extremes` | Hottest / coldest in latest snapshot |
+| `GET /api/v1/analytics/etl-runs` | Recent pipeline runs |
+
+Interactive docs: **http://localhost:8000/docs**
+
 ## Makefile commands
 
 | Command | Description |
@@ -137,11 +186,18 @@ Logs are written to `logs/weather_etl.log` and stdout.
 | `make db-up` | Start PostgreSQL container |
 | `make db-down` | Stop containers |
 | `make db-init` | Start DB + apply schema |
-| `make run` | Execute ETL pipeline |
+| `make docker-build` | Build ETL Docker image |
+| `make docker-up` | Start Postgres + run ETL in Docker |
+| `make docker-down` | Stop full Docker stack |
+| `make api-run` | Run FastAPI locally (port 8000) |
+| `make api-up` | Start Postgres + API in Docker |
+| `make run` | Execute ETL pipeline (local Python) |
 | `make test` | Run unit tests |
 | `make test-cov` | Tests with coverage report |
+| `make test-integration` | Integration tests (Postgres required) |
 | `make lint` | `flake8` + `black --check` |
 | `make format` | Auto-format with `black` |
+| `make pre-commit` | Install and run pre-commit hooks |
 
 ## Testing
 
@@ -151,11 +207,27 @@ make test
 make test-cov
 ```
 
-- **36** unit tests covering extract and transform layers.
-- Loader and full pipeline orchestration tests are planned (see [ROADMAP.md](ROADMAP.md)).
-- Current coverage is ~**43%** overall (load module not yet under test).
+- **89** unit tests across extract, transform, load, utils, models, API, `etl_runs`, and pipeline orchestration.
+- Overall coverage ~**90%** (`src/`); CI fails below **70%**.
+- Loader tests mock SQLAlchemy — no live database required for `make test`.
 
-Tests use mocked HTTP responses — no live API key required for `make test`.
+Tests use mocked HTTP and database responses — no live API key required for `make test`.
+
+### Integration tests (Postgres)
+
+```bash
+make db-up
+make test-integration
+```
+
+Uses a mocked OpenWeather API and a real PostgreSQL instance. CI runs these in a separate job with a Postgres service container.
+
+### Pre-commit (optional, local)
+
+```bash
+pip install -r requirements-dev.txt
+make pre-commit
+```
 
 ## Sample analytics SQL
 
@@ -210,7 +282,11 @@ SELECT 'measurements', COUNT(*) FROM weather.weather_measurements;
 | Star schema | Separates slowly changing attributes (city, condition) from measurements; familiar to analysts and BI tools |
 | Raw SQL in loader | Explicit control over upserts and `ON CONFLICT`; easy to read in interviews |
 | Retry decorator | Transient network timeouts on extract; configurable `MAX_RETRIES` / `RETRY_DELAY` |
-| Validation in transform | Reject malformed API payloads before they hit the database |
+| Pydantic validation | Schema-checked API and transformed records before load |
+| `etl_runs` metadata | Each pipeline run recorded with counts and status |
+| Structured logging | Optional JSON logs with `run_id`, stage, and `duration_ms` |
+| Parallel extract | `ThreadPoolExecutor` with configurable workers and rate limiting |
+| Exit codes | `0` success, `1` failure, `2` partial (for schedulers/CI) |
 | Env-based config | Twelve-factor style; secrets stay in `.env` (never committed) |
 | Mocked unit tests | Fast, deterministic CI without burning API quota |
 
@@ -223,18 +299,53 @@ See [.env.example](.env.example) for all variables. Required:
 | `OPENWEATHER_API_KEY` | API key from OpenWeather |
 | `DB_PASSWORD` | PostgreSQL password (defaults work with `docker-compose.yml`) |
 
+Optional:
+
+| Variable | Description |
+|----------|-------------|
+| `STRUCTURED_LOGGING` | `true` for JSON logs with `run_id` and stage |
+| `LOG_FORMAT` | `text` (default) or `json` |
+| `EXTRACT_WORKERS` | Parallel API fetch threads (default `4`) |
+| `API_RATE_LIMIT_DELAY` | Seconds between API calls (default `0.2`) |
+
+**Analytics examples:** [`sql/analytics_examples.sql`](sql/analytics_examples.sql)
+
+## Example output
+
+Representative pipeline run (full log: [`docs/example-output.txt`](docs/example-output.txt)):
+
+```
+==================================================
+WEATHER ETL PIPELINE
+==================================================
+
+... Successfully fetched weather data for 10/10 cities
+... Transformed 10 records
+... Loaded 10 records, 0 failures
+... ETL run finished: status=success
+
+ Pipeline completed successfully!
+```
+
+## Portfolio resources
+
+| Document | Use for |
+|----------|---------|
+| [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md) | 2-minute interview walkthrough |
+| [`docs/RESUME_BULLETS.md`](docs/RESUME_BULLETS.md) | CV / LinkedIn copy |
+| [`docs/example-output.txt`](docs/example-output.txt) | Screenshot or README sample output |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | How to run checks before a PR |
+
 ## Roadmap
 
-Phase 1 (documentation & tooling) is complete. Planned next steps:
+- **Phase 1** — documentation & tooling ✅
+- **Phase 2** — CI, Docker, pre-commit, full unit test suite ✅
+- **Phase 3** — Pydantic, `etl_runs`, structured logging, integration tests, parallel extract ✅
+- **Phase 4** — FastAPI read API + analytics endpoints ✅
+- **Phase 5** — license, badges, demo script, resume bullets ✅
 
-- GitHub Actions CI (lint, test, coverage gate)
-- `Dockerfile` and full `docker compose` stack for the ETL app
-- Loader unit tests and integration tests with Postgres
-- Pydantic models, `etl_runs` metadata table, structured logging
-- Optional FastAPI read API and scheduled runs
-
-See [ROADMAP.md](ROADMAP.md) for the full timeline.
+See [ROADMAP.md](ROADMAP.md) for the full timeline (local copy if not on GitHub).
 
 ## License
 
-MIT (to be added — see roadmap Phase 5).
+[MIT](LICENSE) — see [LICENSE](LICENSE) for details.

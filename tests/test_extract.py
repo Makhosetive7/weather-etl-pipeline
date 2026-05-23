@@ -214,3 +214,17 @@ class TestWeatherExtractor:
 
         assert len(results) == 0
         assert mock_get.call_count == 0
+
+    @patch("src.extract.requests.get")
+    def test_parallel_fetch_multiple_cities(self, mock_get, mock_requests_response):
+        mock_get.return_value = mock_requests_response
+
+        extractor = WeatherExtractor()
+        cities = [
+            {"name": "London", "country": "GB"},
+            {"name": "Paris", "country": "FR"},
+        ]
+        results = extractor.fetch_weather_for_cities(cities, max_workers=2)
+
+        assert len(results) == 2
+        assert mock_get.call_count == 2

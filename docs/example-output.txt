@@ -1,0 +1,58 @@
+# Example terminal output after `make run`
+# (Representative output — timestamps and counts may vary per run.)
+
+==================================================
+WEATHER ETL PIPELINE
+==================================================
+
+2026-05-21 14:32:01,102 - src.utils - INFO - Starting Weather ETL Pipeline
+2026-05-21 14:32:01,103 - src.utils - INFO - Run time: 2026-05-21 14:32:01.103245
+2026-05-21 14:32:01,215 - src.etl_runs - INFO - ETL run started: 8f3c2a1b-9d4e-4f12-b8c6-1a2b3c4d5e6f
+2026-05-21 14:32:01,318 - src.load - INFO - Database connection established
+2026-05-21 14:32:01,401 - src.extract - INFO - Weather Extractor initialized
+2026-05-21 14:32:01,402 - src.transform - INFO - Weather Transformer initialized
+2026-05-21 14:32:01,450 - src.utils - INFO - Fetching weather data for 10 cities...
+2026-05-21 14:32:04,891 - src.extract - INFO - Successfully fetched weather data for 10/10 cities
+2026-05-21 14:32:04,892 - src.utils - INFO - Extracted 10 records
+2026-05-21 14:32:04,893 - src.utils - INFO - Transforming data...
+2026-05-21 14:32:04,901 - src.transform - INFO - Successfully transformed 10/10 records
+2026-05-21 14:32:04,902 - src.utils - INFO - Transformed 10 records
+2026-05-21 14:32:04,903 - src.utils - INFO - Loading data into database...
+2026-05-21 14:32:05,412 - src.load - INFO - Loaded 10 records, 0 failures
+2026-05-21 14:32:05,413 - src.utils - INFO - Loaded 10 records, 0 failures
+2026-05-21 14:32:05,420 - src.etl_runs - INFO - ETL run finished: 8f3c2a1b-... status=success
+2026-05-21 14:32:05,421 - src.utils - INFO - ETL Pipeline Complete
+2026-05-21 14:32:05,421 - src.utils - INFO - Success: 10 | Failure: 0
+
+ Pipeline completed successfully!
+
+# Example: query warehouse after load
+$ docker compose exec postgres psql -U postgres -d weather_analytics -c \
+  "SELECT city_name, temperature_celsius FROM weather.latest_weather ORDER BY city_name LIMIT 5;"
+
+ city_name | temperature_celsius
+-----------+---------------------
+ Berlin    |               18.20
+ Dubai     |               38.50
+ London    |               15.50
+ Mumbai    |               32.10
+ New York  |               12.30
+(5 rows)
+
+# Example: FastAPI health check after `make api-run`
+$ curl -s http://localhost:8000/health | python -m json.tool
+{
+    "status": "ok",
+    "database": "connected"
+}
+
+$ curl -s "http://localhost:8000/api/v1/analytics/temperature-summary?days=7" | python -m json.tool
+[
+    {
+        "city_name": "Dubai",
+        "country_code": "AE",
+        "avg_temp_c": 36.8,
+        "measurement_count": 14
+    },
+    ...
+]

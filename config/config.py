@@ -1,4 +1,5 @@
 import os
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -32,15 +33,19 @@ class Config:
 
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
     LOG_FILE = os.getenv("LOG_FILE", "logs/weather_etl.log")
-    LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    LOG_FORMAT = os.getenv("LOG_FORMAT", "text")  # text | json
+    STRUCTURED_LOGGING = os.getenv("STRUCTURED_LOGGING", "false").lower() in ("1", "true", "yes")
 
-    REQUEST_TIMEOUT = 10
-    MAX_RETRIES = 3
-    RETRY_DELAY = 5
+    REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", 10))
+    MAX_RETRIES = int(os.getenv("MAX_RETRIES", 3))
+    RETRY_DELAY = int(os.getenv("RETRY_DELAY", 5))
+
+    EXTRACT_WORKERS = int(os.getenv("EXTRACT_WORKERS", 4))
+    API_RATE_LIMIT_DELAY = float(os.getenv("API_RATE_LIMIT_DELAY", 0.2))
 
     @classmethod
     def validate(cls):
-        """Validate that required configuration is present"""
+        """Validate that required configuration is present."""
         if not cls.API_KEY:
             raise ValueError("OPENWEATHER_API_KEY not set in environment variables")
 
