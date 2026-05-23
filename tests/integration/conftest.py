@@ -20,6 +20,24 @@ def _postgres_available(url: str) -> bool:
         return False
 
 
+def _schema_exists(engine) -> bool:
+    with engine.connect() as conn:
+        row = conn.execute(
+            text("SELECT 1 FROM information_schema.schemata WHERE schema_name = 'weather'")
+        ).fetchone()
+    return row is not None
+
+
+def _apply_schema(engine) -> None:
+    schema_path = Path(__file__).resolve().parents[2] / "sql" / "schema.sql"
+    sql = schema_path.read_text()
+    for statement in [s.strip() for s in sql.split(";") if s.strip()]:
+        if statement.upper().startswith("SELECT "):
+            continue
+        with engine.begin() as conn:
+            conn.execute(text(statement))
+
+
 @pytest.fixture(scope="session")
 def integration_db_url():
     url = os.getenv(
@@ -35,14 +53,8 @@ def integration_db_url():
 @pytest.fixture(scope="session")
 def integration_engine(integration_db_url):
     engine = create_engine(integration_db_url)
-    schema_path = Path(__file__).resolve().parents[2] / "sql" / "schema.sql"
-    sql = schema_path.read_text()
-    statements = [s.strip() for s in sql.split(";") if s.strip()]
-    with engine.begin() as conn:
-        for statement in statements:
-            if statement.upper().startswith("SELECT "):
-                continue
-            conn.execute(text(statement))
+    if not _schema_exists(engine):
+        _apply_schema(engine)
     yield engine
     engine.dispose()
 

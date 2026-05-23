@@ -81,10 +81,8 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
 
-      - name: Apply database schema
-        run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
-          PGPASSWORD=postgres psql -h localhost -U postgres -d weather_analytics -f sql/schema.sql
+      - name: Wait for PostgreSQL and apply schema
+        run: python scripts/ci_apply_schema.py
 
       - name: Integration tests
         run: python -m pytest tests/integration -m integration -v

@@ -77,10 +77,10 @@ test-cov:
 	$(PYTHON) -m pytest tests/ --ignore=tests/integration --cov=src --cov-report=term-missing
 
 test-integration: db-up
-	@echo "Waiting for PostgreSQL..."
+	@echo "Waiting for PostgreSQL and applying schema..."
 	@sleep 3
-	$(COMPOSE) exec -T postgres psql -U postgres -d weather_analytics -f - < sql/schema.sql 2>/dev/null || true
-	$(PYTHON) -m pytest tests/integration -m integration -v
+	@DB_HOST=localhost DB_PORT=5435 $(PYTHON) scripts/ci_apply_schema.py
+	@DB_HOST=localhost DB_PORT=5435 $(PYTHON) -m pytest tests/integration -m integration -v
 
 lint:
 	$(PYTHON) -m flake8 src api tests config main.py
